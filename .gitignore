@@ -35,3 +35,5 @@ ENV/
 # IDE
 .idea/
 .vscode/
+
+credentials.json

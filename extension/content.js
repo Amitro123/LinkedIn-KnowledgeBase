@@ -54,20 +54,86 @@ function extractPostData(target) {
         }
     }
 
-    // 3. Extract Post URL
-    // Strategy A: 'data-urn' attribute on the container (Most reliable)
-    // Strategy B: Link in the timestamp
+    // 3. Extract Post URL (Logic: Body External Link > First Comment Link > Permalink)
     let postUrl = "Unknown URL";
-    const urn = postContainer.getAttribute('data-urn');
-    if (urn) {
-        // urn format: urn:li:activity:712345... or urn:li:share:71234...
-        // LinkedIn allows accessing via /feed/update/{urn}
-        postUrl = `https://www.linkedin.com/feed/update/${urn}`;
-    } else {
-        // Try finding the timestamp link
-        const timeLink = postContainer.querySelector('a.update-components-actor__sub-description, a.feed-shared-actor__sub-description');
-        if (timeLink && timeLink.href) {
-            postUrl = timeLink.href.split('?')[0]; // Remove tracking params
+    let externalLinkFound = false;
+
+    // Helper to finding valid external link in a container
+    const findExternalLink = (container) => {
+        if (!container) return null;
+        // Select all anchor tags
+        const links = container.querySelectorAll('a');
+        for (let link of links) {
+            const href = link.href;
+            // Filter out: empty, hashtags, mentions, internal LinkedIn navigation
+            if (!href || href.includes('linkedin.com/in/') || href.includes('linkedin.com/feed/') || href.includes('linkedin.com/search') || link.innerText.startsWith('#')) {
+                continue;
+            }
+            // If we are here, it's likely an external link or a meaningful resource
+            return href;
+        }
+        return null;
+    };
+
+    // Strategy A: Check Post Body for External Link
+    const descriptionBox = postContainer.querySelector('.feed-shared-update-v2__description, .update-components-text, .feed-shared-text');
+    if (descriptionBox) {
+        const bodyLink = findExternalLink(descriptionBox);
+        if (bodyLink) {
+            postUrl = bodyLink;
+            externalLinkFound = true;
+        }
+    }
+
+    // Strategy B: Check First Comment for External Link (if Strategy A failed)
+    if (!externalLinkFound) {
+        try {
+            // Attempt to find the comments section. 
+            // Note: This relies on comments being loaded in the DOM.
+            // We search for the comments list container.
+            const commentsList = postContainer.querySelector('.comments-comment-list, .feed-shared-update-v2__comments-list');
+
+            if (commentsList) {
+                // Get first comment
+                const firstComment = commentsList.querySelector('.comments-comment-item, article.comments-comment-item');
+
+                if (firstComment) {
+                    // Check Author Match
+                    // logic: Extract comment author name and Compare with post authorName
+                    let commentAuthorName = "";
+                    const commentAuthorEl = firstComment.querySelector('.comments-post-meta__name-text, .comments-comment-meta__description-title');
+                    if (commentAuthorEl) {
+                        commentAuthorName = commentAuthorEl.innerText.trim().split('\n')[0];
+                    }
+
+                    // Simple fuzzy check or exact match
+                    if (commentAuthorName && authorName && commentAuthorName.includes(authorName)) {
+                        // Look for link in comment body
+                        const commentBody = firstComment.querySelector('.comments-comment-item__main-content, .feed-shared-main-content--comment');
+                        const commentLink = findExternalLink(commentBody);
+                        if (commentLink) {
+                            postUrl = commentLink;
+                            externalLinkFound = true;
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn("Error checking comments:", err);
+        }
+    }
+
+    // Strategy C: Fallback to LinkedIn Permalink (URN)
+    if (!externalLinkFound) {
+        const urn = postContainer.getAttribute('data-urn');
+        if (urn) {
+            postUrl = `https://www.linkedin.com/feed/update/${urn}`;
+        } else {
+            // Last resort: timestamp link
+            const timeLink = postContainer.querySelector('a.update-components-actor__sub-description, a.feed-shared-actor__sub-description');
+            if (timeLink && timeLink.href) {
+                postUrl = timeLink.href.split('?')[0];
+            }
         }
     }
 

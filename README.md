@@ -1,4 +1,5 @@
 # LinkedIn Knowledge Base Saver
+![Project Architecture](assets/banner.png)
 
 A powerful automation tool that captures LinkedIn posts, summarizes them using Google Gemini AI, and saves them to a structured Google Sheet.
 
@@ -6,11 +7,12 @@ A powerful automation tool that captures LinkedIn posts, summarizes them using G
 
 - **Chrome Extension**: Adds a "Save to Knowledge Base" option to the right-click context menu.
 - **AI-Powered**: Uses Google Gemini (1.5 Flash) to:
-  - Summarize content in Hebrew.
-  - Classify posts (MCP, RAG, Repo, Tool, Automation, Learning, AI).
+  - Summarize content in **Hebrew**.
+  - Classify posts (MCP, RAG, Repo, Tool, Automation, Learning, Trends, AI).
   - Extract Author and URL.
 - **Smart Routing**: Automatically saves posts to specific tabs in Google Sheets based on the AI classification.
-- **Duplicate Prevention**: (Basic logic via appending new rows).
+- **Robust Error Logging**: Logs errors to a local `activity.log` file and a `System_Logs` tab in Google Sheets.
+- **Smart Link Extraction**: Prioritizes external links found in the post body or the first comment (if from the author) over generic LinkedIn permalinks.
 
 ## 🛠️ Architecture
 

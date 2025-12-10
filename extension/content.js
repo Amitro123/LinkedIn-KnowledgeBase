@@ -106,8 +106,10 @@ function extractPostData(target) {
                         commentAuthorName = commentAuthorEl.innerText.trim().split('\n')[0];
                     }
 
-                    // Simple fuzzy check or exact match
-                    if (commentAuthorName && authorName && commentAuthorName.includes(authorName)) {
+                    // Exact match or normalize and compare
+                    const normalizedCommentAuthor = commentAuthorName.toLowerCase().trim();
+                    const normalizedPostAuthor = authorName.toLowerCase().trim();
+                    if (normalizedCommentAuthor === normalizedPostAuthor) {
                         // Look for link in comment body
                         const commentBody = firstComment.querySelector('.comments-comment-item__main-content, .feed-shared-main-content--comment');
                         const commentLink = findExternalLink(commentBody);
@@ -122,7 +124,6 @@ function extractPostData(target) {
             console.warn("Error checking comments:", err);
         }
     }
-
     // Strategy C: Fallback to LinkedIn Permalink (URN)
     if (!externalLinkFound) {
         const urn = postContainer.getAttribute('data-urn');

@@ -81,8 +81,7 @@ class PostData(BaseModel):
 SYSTEM_PROMPT = """
 Analyze this LinkedIn post.
 
-Summary: Write a concise English summary focusing on value/function (max 2 sentences).
-Category: Classify strictly into ONE of these: ['MCP', 'RAG', 'Repo', 'Tool', 'Automation', 'Learning', 'Trend', 'General_AI'].
+Summary: Write a concise English summary focusing on value/function (max 2 sentences).Category: Classify strictly into ONE of these: ['MCP', 'RAG', 'Repo', 'Tool', 'Automation', 'Learning', 'Trend', 'General_AI'].
 Author: Extract the author name.
 
 Verdict: If no external link is found in text or comments, assume it is a 'Trend' or 'Learning' post. 
@@ -165,50 +164,53 @@ async def process_post(data: PostData):
             # We don't raise here, we try to save what we have or log if critical
     
         # 2. Save to Google Sheets
-        if sh:
-            target_tab_name = get_target_worksheet_name(category)
-            
-            # Try to get worksheet
-            try:
-                worksheet = sh.worksheet(target_tab_name)
-            except gspread.WorksheetNotFound:
-                # If tab doesn't exist, maybe create it or fallback to 'AI'?
-                print(f"Tab '{target_tab_name}' not found. Attempting to create.")
-                worksheet = sh.add_worksheet(title=target_tab_name, rows=100, cols=10)
-                # Add headers if new
-                worksheet.append_row(["Date", "Link", "Name", "Function", "Category"])
-    
-            today = datetime.datetime.now().strftime("%Y-%m-%d")
-            
-            # Columns: [Date, Link, Name (Author), Function (Summary), Category]
-            row = [
-                today,
-                data.url,
-                author_ai,
-                summary,
-                category
-            ]
-            
-            worksheet.append_row(row)
-            print(f"Row appended to tab '{target_tab_name}'.")
-                
-        else:
+        if not sh:
             print("Spreadsheet not available. Skipping save.")
             raise HTTPException(status_code=503, detail="Google Sheets connection not active")
+
+        # If we reach here, sh is available
+        target_tab_name = get_target_worksheet_name(category)
+        
+        # Try to get worksheet
+        try:
+            worksheet = sh.worksheet(target_tab_name)
+        except gspread.WorksheetNotFound:
+            # If tab doesn't exist, maybe create it or fallback to 'AI'?
+            print(f"Tab '{target_tab_name}' not found. Attempting to create.")
+            worksheet = sh.add_worksheet(title=target_tab_name, rows=100, cols=10)
+            # Add headers if new
+            worksheet.append_row(["Date", "Link", "Name", "Function", "Category"])
+
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        
+        # Columns: [Date, Link, Name (Author), Function (Summary), Category]
+        row = [
+            today,
+            data.url,
+            author_ai,
+            summary,
+            category
+        ]
+        
+        worksheet.append_row(row)
+        print(f"Row appended to tab '{target_tab_name}'.")
     
         return {"status": "success", "category": category, "summary": summary, "tab": target_tab_name}
 
+    except HTTPException:
+        # Re-raise HTTP exceptions to preserve status codes
+        raise
     except Exception as e:
-        # GLOBAL CATCH-ALL
-        error_msg = f"Fatal Error in process_post: {str(e)}"
+        # GLOBAL CATCH-ALL for unexpected errors
+        error_msg = f"Fatal Error in process_post: {e}"
         print(error_msg)
-        logging.error(traceback.format_exc())
+        logging.exception("Fatal error in process_post")
         
         # Log to Google Sheet System_Logs
         log_error_to_sheet(data.url, str(e))
         
-        # Do not crash the client, return a 500 but handled
-        return {"status": "error", "message": str(e)}
+        # Return proper HTTP error status
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -37,9 +37,21 @@ cd LinkedIn-KnowledgeBase
 ```
 
 ### 2. Backend Setup
-Navigate to the backend directory and install dependencies:
+Navigate to the backend directory, create a virtual environment, and install dependencies.
+
+**Windows (PowerShell):**
+```powershell
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate
+pip install -r requirements.txt
+```
+
+**Mac/Linux:**
 ```bash
 cd backend
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -48,8 +60,10 @@ pip install -r requirements.txt
 2. Add your `GEMINI_API_KEY`.
 3. Add your Google Service Account JSON file as `service_account.json` in the `backend/` folder.
 4. Update `GOOGLE_CREDENTIALS_PATH` in `.env` if named differently.
+5. Add `SPREADSHEET_ID` to your `.env` file (the ID of your Google Sheet).
 
 **Start the Server**:
+Ensure your virtual environment is activated, then run:
 ```bash
 uvicorn main:app --reload
 ```

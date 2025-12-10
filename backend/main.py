@@ -11,6 +11,7 @@ from pydantic import BaseModel
 import uvicorn
 import gspread
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -26,14 +27,24 @@ logging.basicConfig(
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH")
-# CRITICAL: Specific Spreadsheet ID provided by user
-SPREADSHEET_ID = "1wWktmD3QEHIlV9ct_NH_i0UQ5ceyxMrMTTidihBmoSU"
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+
+if not SPREADSHEET_ID:
+    raise ValueError("Error: SPREADSHEET_ID is missing from .env file!")
 
 # Initialize Gemini
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
     print("WARNING: GEMINI_API_KEY not found in .env")
+
+# Define Permissive Safety Settings
+safety_settings = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
 
 # Global variables for resources
 gc: Optional[gspread.Client] = None
@@ -78,13 +89,14 @@ class PostData(BaseModel):
     url: str
 
 # Gemini System Prompt
+# Gemini System Prompt
 SYSTEM_PROMPT = """
 Analyze this LinkedIn post.
+1. **Summary**: Write a concise ENGLISH summary focusing on the tool's value/function. (Max 2 sentences)
+2. **Category**: Classify strictly into ONE: ['MCP', 'RAG', 'Repo', 'Tool', 'Automation', 'Learning', 'Trend', 'General_AI'].
+3. **Author**: Extract the author name.
+4. **Verdict**: If no external link is found, treat as 'Trend' or 'Learning'.
 
-Summary: Write a concise English summary focusing on value/function (max 2 sentences).Category: Classify strictly into ONE of these: ['MCP', 'RAG', 'Repo', 'Tool', 'Automation', 'Learning', 'Trend', 'General_AI'].
-Author: Extract the author name.
-
-Verdict: If no external link is found in text or comments, assume it is a 'Trend' or 'Learning' post. 
 Output valid JSON: { "summary": "...", "category": "...", "author": "..." }
 """
 
@@ -136,8 +148,11 @@ async def process_post(data: PostData):
         author_ai = data.author # Fallback
         
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(f"{SYSTEM_PROMPT}\n\nInput Post Author: {data.author}\nInput Post URL: {data.url}\nInput Post Text:\n{data.text}")
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(
+                f"{SYSTEM_PROMPT}\n\nInput Post Author: {data.author}\nInput Post URL: {data.url}\nInput Post Text:\n{data.text}",
+                safety_settings=safety_settings
+            )
             
             # Clean response to ensure json
             text_response = response.text.strip()

@@ -59,20 +59,30 @@ function extractPostData(target) {
     let externalLinkFound = false;
 
     // Helper to finding valid external link in a container
+    // Helper to finding valid external link in a container
     const findExternalLink = (container) => {
         if (!container) return null;
         // Select all anchor tags
         const links = container.querySelectorAll('a');
         for (let link of links) {
             const href = link.href;
-            // Filter out: empty, hashtags, mentions, internal LinkedIn navigation
-            if (!href || href.includes('linkedin.com/in/') || href.includes('linkedin.com/feed/') || href.includes('linkedin.com/search') || link.innerText.startsWith('#')) {
-                continue;
+            
+            // --- New Condition ---
+            // Skip internal LinkedIn links (profiles, company pages, hashtags)
+            if (href.includes("linkedin.com") || href.includes("hashtag")) {
+                continue; 
             }
-            // If we are here, it's likely an external link or a meaningful resource
+            
+            // If we are here, it's likely an external link!
             return href;
         }
-        return null;
+        
+        // If no external link found, we return null to let the next strategy take over (e.g. comments or permalink)
+        // NOTE: The user requested "return window.location.href" as default, but in this specific helper function context, 
+        // returning 'null' is better because we have fallback strategies (Strategy B, Strategy C). 
+        // Strategy C eventually sets the URL to the permalink. 
+        // HOWEVER, to strictly follow the user request for *this specific function* logic:
+        return window.location.href; 
     };
 
     // Strategy A: Check Post Body for External Link

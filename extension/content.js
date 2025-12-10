@@ -66,23 +66,23 @@ function extractPostData(target) {
         const links = container.querySelectorAll('a');
         for (let link of links) {
             const href = link.href;
-            
+
             // --- New Condition ---
             // Skip internal LinkedIn links (profiles, company pages, hashtags)
             if (href.includes("linkedin.com") || href.includes("hashtag")) {
-                continue; 
+                continue;
             }
-            
+
             // If we are here, it's likely an external link!
             return href;
         }
-        
+
         // If no external link found, we return null to let the next strategy take over (e.g. comments or permalink)
         // NOTE: The user requested "return window.location.href" as default, but in this specific helper function context, 
         // returning 'null' is better because we have fallback strategies (Strategy B, Strategy C). 
         // Strategy C eventually sets the URL to the permalink. 
         // HOWEVER, to strictly follow the user request for *this specific function* logic:
-        return window.location.href; 
+        return window.location.href;
     };
 
     // Strategy A: Check Post Body for External Link
@@ -104,14 +104,14 @@ function extractPostData(target) {
             const commentsList = postContainer.querySelector('.comments-comment-list, .feed-shared-update-v2__comments-list');
 
             if (commentsList) {
-                // Get first comment
-                const firstComment = commentsList.querySelector('.comments-comment-item, article.comments-comment-item');
+                // Get ALL comments, not just the first one
+                const allComments = commentsList.querySelectorAll('.comments-comment-item, article.comments-comment-item');
 
-                if (firstComment) {
+                for (let comment of allComments) {
                     // Check Author Match
-                    // logic: Extract comment author name and Compare with post authorName
                     let commentAuthorName = "";
-                    const commentAuthorEl = firstComment.querySelector('.comments-post-meta__name-text, .comments-comment-meta__description-title');
+                    const commentAuthorEl = comment.querySelector('.comments-post-meta__name-text, .comments-comment-meta__description-title');
+
                     if (commentAuthorEl) {
                         commentAuthorName = commentAuthorEl.innerText.trim().split('\n')[0];
                     }
@@ -119,13 +119,18 @@ function extractPostData(target) {
                     // Exact match or normalize and compare
                     const normalizedCommentAuthor = commentAuthorName.toLowerCase().trim();
                     const normalizedPostAuthor = authorName.toLowerCase().trim();
-                    if (normalizedCommentAuthor === normalizedPostAuthor) {
+
+                    // We check if comment author INCLUDES post author (or vice versa) to be robust
+                    if (normalizedCommentAuthor && normalizedPostAuthor && (normalizedCommentAuthor.includes(normalizedPostAuthor) || normalizedPostAuthor.includes(normalizedCommentAuthor))) {
+
                         // Look for link in comment body
-                        const commentBody = firstComment.querySelector('.comments-comment-item__main-content, .feed-shared-main-content--comment');
+                        const commentBody = comment.querySelector('.comments-comment-item__main-content, .feed-shared-main-content--comment');
                         const commentLink = findExternalLink(commentBody);
+
                         if (commentLink) {
                             postUrl = commentLink;
                             externalLinkFound = true;
+                            break; // Stop after finding the first valid link from the author
                         }
                     }
                 }
